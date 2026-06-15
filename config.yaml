@@ -1,0 +1,5 @@
+input_data:
+  file1: "../data/raw/wakeup_health_dataset.csv"
+
+output_data:
+  file1: ".."
