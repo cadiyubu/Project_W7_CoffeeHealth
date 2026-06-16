@@ -1,5 +1,5 @@
 input_data:
-  file1: "../data/raw/wakeup_health_dataset.csv"
+  file1: "../data/raw/salaries.csv"
 
 output_data:
   file1: ".."
