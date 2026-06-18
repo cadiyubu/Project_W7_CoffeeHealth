@@ -11,31 +11,52 @@ import yaml
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import BaggingRegressor, RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, root_mean_squared_error
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.ensemble import BaggingRegressor, RandomForestRegressor,AdaBoostRegressor, GradientBoostingRegressor
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, root_mean_squared_error
 
 # -- Data loading ---------------------------------------------------------------
 
-def load_raw_data(path, **kwargs):
-    """
-    Load raw CSV. Uses sep=None + python engine to handle
-    Windows CRLF/BOM exports safely.
-    """
-    return pd.read_csv(path, sep=None, engine="python", **kwargs)
-
-
-# -- Config / data source loader ------------------------------------------------
-
 def read_file(yaml_path, inp_data_section, file_name):
+    """Load a CSV whose path is stored in a YAML config.
+    Returns a DataFrame, or None on a handled error."""
+
+    #Read the YAML config
+    try:
+        with open(yaml_path, "r") as file:
+            cfg = yaml.safe_load(file)
+    except FileNotFoundError:
+        print(f"Config file not found: {yaml_path}")
+        return None
+    except yaml.YAMLError as e:
+        print(f"Could not parse YAML: {e}")
+        return None
+
+    #Look up the CSV path inside the config
+    try:
+        csv_path = cfg[inp_data_section][file_name]
+    except KeyError as e:
+        print(f"Missing key in config: {e}")
+        return None
+
+    #Load the CSV (sep=None handles Windows CRLF/BOM exports)
+    return pd.read_csv(csv_path, sep=None, engine="python")
+
+
+def out_csv(df,yaml_path,output_section_yaml,file_name):
     try:
         with open(yaml_path, "r") as file:
             cfg = yaml.safe_load(file)
     except:
         print("Yaml configuration file not found!")
         return None
-
-    raw_df = pd.read_csv(cfg[inp_data_section][file_name])  # ✅
-    return raw_df
-
+        
+    df.to_csv(cfg[output_section_yaml][file_name], index=False)
+    print(f"File saved to: {cfg[output_section_yaml][file_name]}")
 
 # -- EDA helpers ----------------------------------------------------------------
 
@@ -96,3 +117,53 @@ def df_full_standarized(X_train_dumm,X_test_dumm,X_train_num,X_test_num):
     dfX_test_full_np_df  = pd.DataFrame(dfX_test_full_np, columns=dfX_test_full.columns, index=dfX_test_full.index)
 
     return dfX_train_full_np_df, dfX_test_full_np_df
+
+    # -- Models creation ----------------------------------------------------
+
+def linear_regmodelling(train_df, test_df, y_train, y_test):
+
+    lin_reg = LinearRegression()
+    lin_reg.fit(train_df, y_train) # Determines the b0 and b1's values
+    y_pred_test_lr = lin_reg.predict(test_df)
+    print(f"MAE {mean_absolute_error(y_pred_test_lr, y_test): .2f}") # mean(abs(error)) = mean(abs(y_test - y_pred_test))
+    print(f"RMSE, {mean_squared_error(y_pred_test_lr, y_test): .2f}") # sqrt( mean( (y_test - y_pred_test)^2 ) ) # b0, b1, b2...
+    print(f"R2 score, {lin_reg.score(test_df, y_test): .2f}")
+    return y_pred_test_lr
+
+def RanForeRegr_modelling(train_df, test_df, y_train, y_test):
+    PARAMS = {
+    'n_estimators': 100,
+    'max_depth': 20,
+    'random_state': 42}
+    
+    rf = RandomForestRegressor(**PARAMS).fit(train_df,y_train)
+ 
+    y_pred = rf.predict(test_df)
+    r2_rf = rf.score(test_df, y_test)
+
+    print(f"  R2 Score: {r2_rf:.4f}")
+    print(f"  MAE:      {mean_absolute_error(y_test, y_pred):.2f}")
+    print(f"  MSE:      {mean_squared_error(y_test, y_pred):.2f}")
+    print(f"  RMSE:     {root_mean_squared_error(y_test, y_pred):.2f}")  
+
+    return y_pred
+
+def bagreg_RanForeRegr_modelling(train_df, test_df, y_train, y_test):
+    PARAMS = {
+    'n_estimators': 100,
+    'max_depth': 20,
+    'random_state': 42}
+    
+    bagrf = BaggingRegressor(RandomForestRegressor(**PARAMS)).fit(train_df,y_train)
+ 
+    y_pred = bagrf.predict(test_df)
+    r2_bagrf = bagrf.score(test_df, y_test)
+
+    print(f"  R2 Score: {r2_bagrf:.4f}")
+    print(f"  MAE:      {mean_absolute_error(y_test, y_pred):.2f}")
+    print(f"  MSE:      {mean_squared_error(y_test, y_pred):.2f}")
+    print(f"  RMSE:     {root_mean_squared_error(y_test, y_pred):.2f}")  
+
+    return y_pred
+
+
