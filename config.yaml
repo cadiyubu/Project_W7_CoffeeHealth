@@ -2,4 +2,4 @@ input_data:
   file1: "../data/raw/salaries.csv"
 
 output_data:
-  file1: ".."
+  file1: "../data/clean/X_df_ModelDiana.csv"
