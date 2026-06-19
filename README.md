@@ -2,13 +2,12 @@
 
 ## Project Description
 
-Predict `salary_in_usd` for global AI / ML / Data roles using supervised regression.
-Two complementary models are built on the same cleaned dataset:
+As students of the DA bootcamp, we wanted to estimate the salary opportunities the job market could offer after this program. The project predicts `salary_in_usd` for global AI / ML / Data roles using supervised regression, built as two complementary models on the same cleaned dataset:
 
 - **Model 1 (Diana)** — company-side features: `job_title`, `company_size`, `company_region`, `work_year`.
-- **Model 2 (Bibian)** — experience-side features, anchored on `experience_level`, optimised separately with Random Forest + Optuna.
+- **Model 2 (Bibian)** — experience-side features: `experience_level`, `employment_type`, `job_title`, `employee_residence`.
 
-Both halves use the same train/test split and the same Random Forest + Bayesian (Optuna) tuning approach, so results are directly comparable once Bibian's half is complete (see **Pending: Joint Model Comparison** below).
+Both halves use the same train/test split and the same model family progression (KNN → Linear Regression → Random Forest → Bagging-RF → Optuna-tuned Random Forest), so results are directly comparable. See **Joint Model Comparison** below for the head-to-head result.
 
 ## Data Sources
 
@@ -19,21 +18,29 @@ Both halves use the same train/test split and the same Random Forest + Bayesian 
 
 ## Techniques Used
 
-- Feature engineering: country → region grouping (`company_region`), rare job-title collapsing (titles with fewer than 150 occurrences grouped into `'Other'`), derived `companyloc_residence` boolean flag
-- Feature selection: boxplots by category + one-way ANOVA (`f_oneway`) — all three categorical features rejected H0 (p < 0.05) and were kept
+- Feature engineering: country → region grouping (`company_region`), rare job-title collapsing (titles with fewer than 150 occurrences grouped into `'Other'`), derived `companyloc_residence` boolean flag (Model 1)
+- Feature selection: boxplots by category + one-way ANOVA (`f_oneway`) — for both models, all candidate categorical features reject H0 (p < 0.05): Model 1 keeps `job_title`, `company_region`, `company_size`; Model 2 keeps `experience_level`, `employment_type`, `job_title`, `employee_residence`
 - Encoding & scaling: `OneHotEncoder(drop='first')` on nominal columns + `StandardScaler` on the combined numeric + dummy matrix
-- Regression models tried: KNeighbors, Linear Regression, Random Forest, Bagging Regressor (Random Forest base)
-- Hyperparameter tuning: Bayesian optimisation (Optuna, TPE sampler) on Random Forest — 45 trials, 10-fold cross-validation, tuning `max_depth`, `min_samples_split`, `max_leaf_nodes`, `max_features`
+- Regression models tried (both models): KNeighbors, Linear Regression, Random Forest, Bagging Regressor (Random Forest base)
+- Hyperparameter tuning: Bayesian optimisation (Optuna, TPE sampler) on Random Forest for both models — Model 1: 45 trials / 10-fold CV; Model 2: 30 trials / 10-fold CV — tuning `max_depth`, `min_samples_split`, `max_leaf_nodes`, `max_features`
 - Evaluation: R², MAE, MSE, RMSE — reported on both a single 80/20 test split and 10-fold cross-validation (kept clearly separate; see note below)
 
-## Key Result (Diana's half)
+## Key Results
 
-All four model families converge to a similar ceiling: **R² ≈ 0.20–0.25** depending on model and evaluation method. Plain Random Forest and the Optuna-tuned Random Forest land within noise of each other once both are evaluated under the same 10-fold CV procedure (~0.217 vs ~0.220). This convergence across structurally different algorithms (distance-based, linear, and tree-based) points to a **feature information ceiling**, not a model-choice or tuning problem — the next real lever is `experience_level`, which sits in Bibian's half of the feature set.
+**Model 1 (company-side features)** — three model families converge to a similar ceiling: **R² ≈ 0.24–0.25** on the single test-split (Linear Regression 0.240, Random Forest baseline 0.241, Random Forest Optuna-tuned 0.246). KNeighbors lags at R² ≈ 0.185. Under 10-fold CV, the Optuna-tuned Random Forest's mean R² is **0.2171** (95% CI: 0.2068–0.2329) — within noise of the untuned baseline (~0.003 R² gain).
 
+**Model 2 (experience-side features)** — converges to a higher ceiling: **R² ≈ 0.27–0.28** on the single test-split (KNN 0.221, Linear Regression 0.274, Random Forest baseline 0.280, Bagging-RF 0.281, Optuna-tuned RF 0.281). MAE drops from ~46,500 USD (KNN) to ~44,050–44,096 USD for the other four models. Optuna gain over baseline is negligible here too.
 
-## Pending: Joint Model Comparison
+Both models show the same diagnostic pattern: structurally different algorithms (distance-based, linear, tree-based) converge to the same R² ceiling for their respective feature set, and Bayesian tuning adds at most ~0.005 R² in either case. This is a **feature-ceiling signal, not a model-choice or tuning problem.**
 
-TBC by Bibian
+> Single test-split R² and cross-validated mean R² are deliberately reported separately, never mixed. A single 80/20 split can land 2–3 points higher or lower purely from sampling luck (e.g. Model 1's Random Forest reads 0.241 on the single split vs 0.217 under CV). The single-split model-comparison charts (`figures/R2_Modelscomparisons.png` and Bibian's equivalent) are single-split; the Optuna confidence-interval figures are cross-validated.
+
+## Joint Model Comparison
+
+Model 2 (experience-side features) outperforms Model 1 (company-side features) by roughly **0.03–0.04 R²** across every matched model family (e.g. Optuna-tuned RF: 0.281 vs 0.246). `experience_level` and `employment_type` carry more salary signal on their own than the company-side feature set — consistent with the column-importance chart on the Team Split slide, where `job_title` (0.58) and `experience_level` (0.21) dominate over `employee_residence` (0.15) and `employment_type` (~0).
+
+Neither model individually reaches R² above ~0.28 — confirming that for this dataset, salary variance is only partially explained by either feature group alone. A combined model (both feature sets together) was identified as a natural next step but was **not built**, due to time constraints ahead of this presentation.
+
 
 ## Functions (`notebooks/functions.py`)
 
@@ -71,6 +78,7 @@ jupyter lab
 Run notebooks in order:
 1. `notebooks/explore_clean_modelingv2_diana.ipynb` — EDA, feature engineering, feature selection (ANOVA), preprocessing, base model comparison (KNN / Linear / Random Forest / Bagging-RF), exports the cleaned feature set to `data/clean/X_df_ModelDiana.csv`.
 2. `notebooks/model_building_diana.ipynb` — loads the exported clean data, re-fits baseline Linear Regression and Random Forest, runs Optuna Bayesian tuning on Random Forest (10-fold CV, 45 trials), evaluates the tuned model on the held-out test set, and produces the final model comparison figures.
+3. `notebooks/claening_data_Bibian.ipynb` — Model 2 pipeline: EDA, data cleaning, ANOVA feature selection on experience-side features (`experience_level`, `employment_type`, `job_title`, `employee_residence`), base model comparison (KNN / Linear / Random Forest / Bagging-RF), and Optuna Bayesian tuning on Random Forest (10-fold CV, 30 trials).
 
 ## Project Structure
 
@@ -95,15 +103,36 @@ Run notebooks in order:
 ├── notebooks/
 │   ├── functions.py                  ← shared helper functions (table above)
 │   ├── explore_clean_modelingv2_diana.ipynb
-│   └── model_building_diana.ipynb
-└── slides/                           ← presentation (placeholders for Bibian's results)
+│   ├── model_building_diana.ipynb
+│   └── claening_data_Bibian.ipynb    ← Model 2 (Bibian) — full pipeline
+└── slides/                           ← final presentation
 ```
 
+## Key Findings & Insights
+
+- 🌍 **Geography matters** — grouping countries into regions trades some country-level granularity for model speed and a more tractable category space.
+- 📉 **Feature ceiling is real** — both models converge to their respective ceilings (R² ≈ 0.24 for Model 1, ≈ 0.28 for Model 2) across structurally different algorithms. That's diagnostic of the feature set, not a model-choice problem — a better feature set matters more than better tuning.
+- 🔧 **Tuning ≠ cure** — Bayesian optimisation (Optuna) on both models gained at most ~0.005 R² over baseline. At a feature ceiling, tuning delivers diminishing returns.
+- 🧪 **R² reporting discipline** — single test-split and CV results are reported separately throughout; mixing them would inflate apparent performance by 2–3 percentage points.
+
+## Challenges & Learnings
+
+- ⚠️ **KNN classifier → regressor** — one-hot dummies plus mixed scales across categories added complexity that didn't pay off; KNN consistently underperforms the other model families on both feature sets.
+- 🔄 **Feature engineering before split** — under time pressure, the company-side vs. experience-side split was made intuitively rather than through formal feature selection across the full column set. A more rigorous approach would allocate more time to feature selection per model before committing to the split.
+- 🔬 **Convergence = diagnosis** — four structurally different algorithms landing on the same R² for a given feature set isn't a failure; it's a signal about how much salary variance that feature set can explain.
+
+## Real-World Application & Impact
+
+- **Salary benchmarking** — HR teams can use a tuned model to flag underpaid roles or benchmark new hires against market ranges, especially in remote-first AI orgs where geography no longer fully anchors pay.
+- **Career navigation** — job-seekers can estimate the USD salary premium of a title, region, experience level, or company-size choice before accepting an offer.
+- **Limitation — no time-forward prediction** — the dataset only spans `work_year` 2020–2024, so current and future salary projections are not supported by the ML techniques used here; this would require a different modelling approach (e.g. time-series methods) and is out of scope for this project.
+
+
 ## Contributors
-- Diana Yule — company-feature model, EDA, feature engineering, base model comparison, Optuna tuning
-- Bibian — experience-feature model (in progress)
+- Diana Yule — Model 1 (company-side features): EDA, feature engineering, base model comparison, Optuna tuning, presentation
+- Bibian — Model 2 (experience-side features): EDA, data cleaning, feature selection, base model comparison, Optuna tuning
 
 ## Links
 - Presentation: https://docs.google.com/presentation/d/1gQCRVV1ZCu3K6sQIn_v6LvVm_OvJhK4pV4hXGplZq1o/edit?slide=id.p9#slide=id.p9
-- Kanban board: 
+- Kanban board: https://trello.com/b/IVZJzCng/salary-project-w7
 
