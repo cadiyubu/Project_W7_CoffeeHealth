@@ -21,6 +21,7 @@ from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error, r
 
 # -- Data loading ---------------------------------------------------------------
 
+
 def read_file(yaml_path, inp_data_section, file_name):
     """Load a CSV whose path is stored in a YAML config.
     Returns a DataFrame, or None on a handled error."""
@@ -120,13 +121,19 @@ def df_full_standarized(X_train_dumm,X_test_dumm,X_train_num,X_test_num):
 
     # -- Models creation ----------------------------------------------------
 
+def knn_modelling(train_df, test_df, y_train, y_test):
+    knn = KNeighborsRegressor()
+    knn.fit(train_df, y_train)
+    return f"The R2 of the model is {knn.score(test_df, y_test):.2f}"
+
 def linear_regmodelling(train_df, test_df, y_train, y_test):
 
     lin_reg = LinearRegression()
     lin_reg.fit(train_df, y_train) # Determines the b0 and b1's values
     y_pred_test_lr = lin_reg.predict(test_df)
     print(f"MAE {mean_absolute_error(y_pred_test_lr, y_test): .2f}") # mean(abs(error)) = mean(abs(y_test - y_pred_test))
-    print(f"RMSE, {mean_squared_error(y_pred_test_lr, y_test): .2f}") # sqrt( mean( (y_test - y_pred_test)^2 ) ) # b0, b1, b2...
+    print(f"MSE,  {mean_squared_error(y_pred_test_lr, y_test): .2f}")  # mean( (y_test - y_pred_test)^2 )
+    print(f"RMSE, {root_mean_squared_error(y_pred_test_lr, y_test): .2f}") # sqrt(MSE), same units as salary_in_usd
     print(f"R2 score, {lin_reg.score(test_df, y_test): .2f}")
     return y_pred_test_lr
 
